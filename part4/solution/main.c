@@ -7,8 +7,6 @@
 #include "driver/gpio.h"
 #include "esp32s3_setup.h"
 
-#define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
-
 // Use only core 1
 #if CONFIG_FREERTOS_UNICORE
 static const BaseType_t app_cpu = 0;
@@ -19,7 +17,6 @@ static const BaseType_t app_cpu = 1;
 // Log tags
 static const char *tag_a = "tag_a";
 static const char *tag_b = "tag_b";
-static const char *overhead_tag = "overhead_tag";
 
 // Task handles
 static TaskHandle_t handle_a = NULL;
@@ -28,7 +25,7 @@ static TaskHandle_t handle_b = NULL;
 char *str_buf = NULL;
 bool notice = false;
 
-void task_a(void *params)
+static void task_a(void *params)
 {
         char input_buffer[2];
         int str_buf_len = 10;
@@ -42,7 +39,7 @@ void task_a(void *params)
                         str_buf = calloc(str_buf_len, sizeof(char));
                         if (str_buf == NULL) {
                                 ESP_LOGE(tag_a, "Out of memory");
-                                exit(0);
+                                esp_restart();
                         }
                 }
                 
@@ -51,7 +48,7 @@ void task_a(void *params)
                         str_buf = realloc(str_buf, str_buf_len * sizeof(char));
                         if(str_buf == NULL) {
                                 ESP_LOGE(tag_a, "Out of memory");
-                                exit(0);
+                                esp_restart();
                         }
                 }
 
@@ -64,7 +61,7 @@ void task_a(void *params)
         }
 }
 
-void task_b(void *params)
+static void task_b(void *params)
 {
         while(1) {
                 if(notice == true) {
@@ -75,16 +72,6 @@ void task_b(void *params)
                         ESP_LOGI(tag_b, "Heap remaining: %d", xPortGetFreeHeapSize());
                 }
                 vTaskDelay(50 / portTICK_PERIOD_MS);
-        }
-}
-
-void overhead_task(void *params)
-{
-        while(1) {
-                ESP_LOGI(tag_a, "Task A high watermark: %d", uxTaskGetStackHighWaterMark(handle_a));
-                ESP_LOGI(tag_b, "Task B high watermark: %d", uxTaskGetStackHighWaterMark(handle_b));
-                ESP_LOGI(overhead_tag, "Overhead task high watermark: %d", uxTaskGetStackHighWaterMark(NULL));
-                vTaskDelay(20000 / portTICK_PERIOD_MS);
         }
 }
 
