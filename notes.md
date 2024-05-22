@@ -1,4 +1,6 @@
-# Part 1 - What is a Real Time Operating System(RTOS)?
+# Introduction to RTOS
+
+## Part 1 - What is a Real Time Operating System(RTOS)?
 
 General purpose OS like windows or linux are designed with human interaction as the most important feature, and the scheduler prioritises such tasks. Scheduler is non-deterministic and we can't tell exactly which tasks will be performed when and for how long. Not ideal when strict timing dealines are required, like medical or industrial devices.
 
@@ -13,12 +15,15 @@ FreeRTOS: Task = Thread
 
 An RTOS might take up too much memory and processing resources of a microcontroller, but is viable running on a more powerful device like an ESP32. An ESP32 is capable of running concurrent tasks, even the wireless stack that takes up a lot of ram and processing power. Running and RTOS on an ESP32 allows it to meet strict timing deadlines.
 
-# Part 2 - Getting started with FreeRTOS
+## Part 2 - Getting started with FreeRTOS
 
 ESPIDF runs a modified version of FreeRTOS to support the ESP32's symmetric multiprocessing architecture that utilises the multiple cores. [Here is a list of changes](https://docs.espressif.com/projects/esp-idf/en/release-v4.3/esp32/api-guides/freertos-smp.html) made to the [IDF FreeRTOS](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/system/freertos_idf.html).
 
-## Code
-`vTaskDelay(500 / portTICK_PERIOD_MS)` 500ms non-blocking delay for FreeRTOS  
+### Code
+* `vTaskDelay(500 / portTICK_PERIOD_MS)` 500ms non-blocking delay for FreeRTOS
+* `vTaskStartScheduler()` Only in vanilla FreeRTOS, to start the task
+
+Create task:
 
     xTaskCreatePinnedToCore( // Creates task with affinity to specified CPU core
     	myFunc, // Function to be called
@@ -30,9 +35,11 @@ ESPIDF runs a modified version of FreeRTOS to support the ESP32's symmetric mult
     	app_cpu // CPU core (static const BaseType_t app_cpu = 1)
     );
 
-`vTaskStartScheduler()` Only in vanilla FreeRTOS, to start the task  
+* `static const char *TAG = "Module_A";` Create log tag
+* `ESP_LOGW(tag_a, "Invalid input");` Log warning
+* Also ESP_LOGE(error), ESP_LOGI(info), ESP_LOGD(debug), ESP_LOGV(verbose)
 
-# Part 3 - Task Scheduling
+## Part 3 - Task Scheduling
 States where tasks can be in:
 
 * Ready: Can run at any time, but not yet given CPU time by the scheduler
@@ -44,11 +51,11 @@ For a task, all the current values in ram and CPU registers during it's executio
 
 Much of this context is stored in the task stack, and therefore every task created has to have a minimum amount of stack memory allocated.
 
-## Code
-`vTaskSuspend()` Enters the suspended state  
-`vTaskResume()` Enters the ready state  
+### Code
+* `vTaskSuspend()` Enters the suspended state  
+* `vTaskResume()` Enters the ready state  
 
-# Part 4 - Memory Management
+## Part 4 - Memory Management
 
 * **Static memory** is determined at compile time, and stores **global and static variables**. This is known as **static allocation** and the variables here exist for the duration of the program.
 
@@ -56,7 +63,7 @@ Much of this context is stored in the task stack, and therefore every task creat
 
 * **Heap memory** is used for dynamic allocation, where the programmer explicitly reserves memory through functions like malloc. Allocated memory has to be freed after use, or the heap might grow indefinitely, known as a memory leak. As it grows towards the stack, it might even overwrite areas of the stack causing undefined behaviour.
 
-## ESP32
+### ESP32
 In ESP32, the heap contains dynamically allocated memory, tasks and kernel objects. 
 
 A task created with xTaskCreate() is assigned a portion of memory from the heap. The portion is divided up into a task control block(TCB) and stack for the task. The TCB is a stuct which contains information about the task like task stack address and priority level. The stack's size can be changed from xTaskCreate().
@@ -67,16 +74,36 @@ During dynamic allocation, the largest contiguous block of heap memory available
 
 In newer versions of FreeRTOS, you can use xTaskCreateStatic() to allocate static memory for tasks and kernel objects in static memory. This is useful for mission critical applications where memory leaks cannot be allowed to occur.
 
-## Code
-`pvPortMalloc()` Thread safe version of malloc for FreeRTOS
-`vPortFree(ptr)` Thread safe version of free for FreeRTOS
-`uxTaskGetStackHighWaterMark(NULL)` Get remaining stack memory in words
-`xPortGetFreeHeapSize()` Get remaining heap memory in bytes
+### Code
+* `pvPortMalloc()` Thread safe version of malloc for FreeRTOS  
+* `vPortFree(ptr)` Thread safe version of free for FreeRTOS  
+* `uxTaskGetStackHighWaterMark(NULL)` Get remaining stack memory in words  
+* `xPortGetFreeHeapSize()` Get remaining heap memory in bytes  
 
-# Serial communication on ESP32-S3
+## Part 5 - Queues
+The data bus width of the ESP32 is 32 bits wide, this is the number of bits that it can process, transfer or access in a single operation. When working with data greater than 32 bits, such as storing a 64 bit number, the operation could take multiple cycles to complete. There is a chance that the operations do not occur consecutively, and another operation could pre-empt the second operation. If the other operation is also accessing the same memory location, it could result in data corruption or race conditions and other unpredictable results.
+
+To solve this issue, we need atomic operations that guarantee the operations are completed without interruption.
+
+A queue is a FIFO data structure provided by FreeRTOS to pass data between tasks. As long as we interact with the queue with built-in kernel functions, these operations are guaranteed to be atomic. Another task cannot interupt the writing process. 
+
+Interupt service routines do not depend on the tick timer and will not respect the atomic nature of the processes, so we need to use special ISR queue functions.
+
+Unless explictly made to store a pointer, queues are copy-by-reference, and will store an full copy of the data. We need to ensure any pointers point to memory that is still in-scope when we read from it.
+
+https://www.freertos.org/a00018.html
+
+### Code
+* `static QueueHandle_t my_queue;` Create queue handle
+* `my_queue = xQueueCreate(queue_len, sizeof(data));` Create queue
+* `xQueueSend(my_queue, (void *)&num, 10)` Send data to queue, returns pdTRUE on success  
+* `xQueueReceive(my_queue, (void *)&item, 10)` Receive data from queue, returns pdTRUE on success 
+* 10 is number of ticks to wait if data does get sent or received, such as full or empty queue
+
+## Serial communication on ESP32-S3
 
 Successful setup would allow using standard C functions like printf and fgets. 
 
 On ESP-IDF, open `idf.py menuconfig`. Navigate to `Component Config/ESP System Settings/Channel for console output` option and ensure that `USB Serial/JTAG Controller` is selected.
 
-On forums, it is recommended to install the usb-serial-jtag driver, but that is no longer necessary.
+On forums, it was recommended to install the usb-serial-jtag driver, but that is no longer necessary.

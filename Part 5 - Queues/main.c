@@ -1,18 +1,4 @@
-#include <stdio.h>
-#include <stdint.h>
-#include <string.h>
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-#include "esp_log.h"
-#include "driver/gpio.h"
-#include "esp32s3_setup.h"
-
-// Use only core 1
-#if CONFIG_FREERTOS_UNICORE
-static const BaseType_t app_cpu = 0;
-#else
-static const BaseType_t app_cpu = 1;
-#endif
+#include "tdisplays3.h"
 
 // Log tags
 static const char *tag_a = "tag a";
@@ -56,7 +42,6 @@ static void send_queue(void *params)
 void app_main(void)
 {
         vTaskDelay(1000 / portTICK_PERIOD_MS);
-        esp32s3_serial_setup();
 
         // Create queue
         msg_queue = xQueueCreate(queue_len, sizeof(int));
