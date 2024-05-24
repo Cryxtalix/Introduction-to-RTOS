@@ -1,28 +1,4 @@
-#include <stdio.h>
-#include <stdint.h>
-#include <string.h>
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-#include "semphr.h"
-#include "esp_log.h"
-#include "driver/gpio.h"
-#include "esp32s3_setup.h"
-
-// Use only core 1
-#if CONFIG_FREERTOS_UNICORE
-static const BaseType_t app_cpu = 0;
-#else
-static const BaseType_t app_cpu = 1;
-#endif
-
-// Log tags
-//static const char *tag_a = "tag a";
-//static const char *tag_b = "tag b";
-//static const char *tag_i = "tag input";
-
-// Queue
-//static const uint8_t queue_len = 5;
-//static QueueHandle_t queue1;
+#include "tdisplays3.h"
 
 // Mutex
 static SemaphoreHandle_t mutex;
@@ -51,8 +27,6 @@ static void taskB(void *params)
 
 void app_main(void)
 {
-        esp32s3_serial_setup();
-
         gpio_reset_pin(PIN_LCD_BL);
         gpio_set_direction(PIN_LCD_BL, GPIO_MODE_OUTPUT);
 

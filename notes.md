@@ -87,7 +87,7 @@ To solve this issue, we need atomic operations that guarantee the operations are
 
 A queue is a FIFO data structure provided by FreeRTOS to pass data between tasks. As long as we interact with the queue with built-in kernel functions, these operations are guaranteed to be atomic. Another task cannot interupt the writing process. 
 
-Interupt service routines do not depend on the tick timer and will not respect the atomic nature of the processes, so we need to use special ISR queue functions.
+Interupt service routines do not depend on the tick timer and will not respect the atomic nature of the processes, so we need to use special FromISR functions.
 
 Unless explictly made to store a pointer, queues are copy-by-reference, and will store an full copy of the data. We need to ensure any pointers point to memory that is still in-scope when we read from it.
 
@@ -98,7 +98,30 @@ https://www.freertos.org/a00018.html
 * `my_queue = xQueueCreate(queue_len, sizeof(data));` Create queue
 * `xQueueSend(my_queue, (void *)&num, 10)` Send data to queue, returns pdTRUE on success  
 * `xQueueReceive(my_queue, (void *)&item, 10)` Receive data from queue, returns pdTRUE on success 
-* 10 is number of ticks to wait if data does get sent or received, such as full or empty queue
+	* 10 is number of ticks to wait if data does get sent or received, such as full or empty queue
+
+## Part 6 - Mutex
+A race condition is an issue where a system's behaviour is dependent on the timing on uncontrollable events.The section of code that works with a shared global variable is known as a critical section. A critical section works with shared resources and must execute in its entirety by a task before it can be interupted by another task.
+
+Mutual exclusion protects critical sections by preventing other tasks from interupting it before it is has completed its execution entirely. There are several kernel objects to choose from to accomplish the task.
+
+### Protecting shared resources and synchronizing threads
+* Queue: Pass data between threads
+* Lock: Allows only one thread to enter the "locked" section of code
+* Mutex(MUTual EXclusion): Like a lock, but system wide and shared by multiple processes
+* Semaphore: Allows a set number of threads to enter a critical section, used to signal to other threads
+
+Interupt service routines do not depend on the tick timer and will not respect the atomic nature of the processes, so we need to use special FromISR functions.
+
+https://www.freertos.org/a00113.html
+
+### Code
+* `#include "freertos/semphr.h"` For vanilla FreeRTOS
+* `static SemaphoreHandle_t my_mutex;` Create mutex handle, mutex and semaphore handles are handled together in FreeRTOS
+* `my_mutex = xSemaphoreCreateMutex();` Create mutex
+* `xSemaphoreTake(my_mutex, 10)` Take semaphore, returns pdTRUE on success. Use this as conditional for an if statement to protect a critical section.
+	* 10 is number of ticks to wait
+* `xSemaphoreGive(my_mutex)` Return mutex
 
 ## Serial communication on ESP32-S3
 
