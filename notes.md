@@ -96,14 +96,16 @@ https://www.freertos.org/a00018.html
 ### Code
 * `static QueueHandle_t my_queue;` Create queue handle
 * `my_queue = xQueueCreate(queue_len, sizeof(data));` Create queue
+	* `my_queue == NULL` if unsuccessful
 * `xQueueSend(my_queue, (void *)&num, 10)` Send data to queue, returns pdTRUE on success  
 * `xQueueReceive(my_queue, (void *)&item, 10)` Receive data from queue, returns pdTRUE on success 
 	* 10 is number of ticks to wait if data does get sent or received, such as full or empty queue
+	* Alternatively `portMAX_DELAY` to wait indefinitely
 
 ## Part 6 - Mutex
-A race condition is an issue where a system's behaviour is dependent on the timing on uncontrollable events.The section of code that works with a shared global variable is known as a critical section. A critical section works with shared resources and must execute in its entirety by a task before it can be interupted by another task.
+A race condition is an issue where a system's behaviour is dependent on the timing on uncontrollable events.The section of code that works with a shared global resources is known as a critical section. A critical section works with shared resources and must execute in its entirety by a task before it can be interupted by another task. Mutual exclusion protects critical sections by preventing other tasks from interupting it before it is has completed its execution entirely. There are several kernel objects to choose from to accomplish the task.
 
-Mutual exclusion protects critical sections by preventing other tasks from interupting it before it is has completed its execution entirely. There are several kernel objects to choose from to accomplish the task.
+A mutex at it's simplest form, is a boolean variable conveying whether a shared resource is in use or not. Shared resources should not be accessed if the mutex is not available.
 
 ### Protecting shared resources and synchronizing threads
 * Queue: Pass data between threads
@@ -119,9 +121,35 @@ https://www.freertos.org/a00113.html
 * `#include "freertos/semphr.h"` For vanilla FreeRTOS
 * `static SemaphoreHandle_t my_mutex;` Create mutex handle, mutex and semaphore handles are handled together in FreeRTOS
 * `my_mutex = xSemaphoreCreateMutex();` Create mutex
+	* `my_mutex == NULL` if unsuccessful
 * `xSemaphoreTake(my_mutex, 10)` Take semaphore, returns pdTRUE on success. Use this as conditional for an if statement to protect a critical section.
 	* 10 is number of ticks to wait
+	* Alternatively `portMAX_DELAY` to wait indefinitely
 * `xSemaphoreGive(my_mutex)` Return mutex
+
+## Part 7 - Semaphore
+Semaphore is like a mutex, but a positive number rather than just a boolean. A semaphore has an initial value >1, and can be taken multiple times until it reaches 0. However it is not usually used in the same way as mutexes.
+
+Semaphores are typically used to synchronise threads, such as in a producer/consumer model. One or more tasks add or remove data from a shared resources that can grow unbounded, such as a linked list or buffer. We can limit the maximum size of the resource by setting the maximum size of the semaphore. Note that a mutex might still be necessary to protect the reading and writing process to the shared resource.
+
+* Mutex
+	* Imply ownership of a given resource
+	* Many implementations of mutexes such as in FreeRTOS include a form of priority inheritance, the priority level of tasks that hold mutexes are automatically raised to prevent a higher priority task from being blocked for a long time. 
+
+* Semaphore
+	* Can be used from ISR.
+
+### Code
+* `static SemaphoreHandle_t my_sem;` Create semaphore handle
+* `my_sem = xSemaphoreCreateBinary();` Creates binary semaphore(only goes up to 1)
+	* `my_sem == NULL` if unsuccessful
+* `my_sem = xSemaphoreCreateCounting(total_num, initial_num);` Creates counting semaphore
+	* `my_sem == NULL` if unsuccessful
+* `xSemaphoreTake(my_sem, 10)` Take semaphore, returns pdTRUE on success. Use this as conditional for an if statement to protect a critical section.
+	* 10 is number of ticks to wait
+	* Alternatively `portMAX_DELAY` to wait indefinitely
+* `xSemaphoreGive(my_sem)` Return mutex
+
 
 ## Serial communication on ESP32-S3
 
