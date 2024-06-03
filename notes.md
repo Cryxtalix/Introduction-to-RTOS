@@ -150,11 +150,49 @@ Semaphores are typically used to synchronise threads, such as in a producer/cons
 	* Alternatively `portMAX_DELAY` to wait indefinitely
 * `xSemaphoreGive(my_sem)` Return mutex
 
+## Part 8 - Software Timer
+### Possible approaches to perform a task periodically
+* `vTaskDelay()` cannot be used to define regular intervals if the task itself takes time to complete.
+* `xTaskGetTickCount()` will require setting up a whole task to keep time, and will compete for resources.
+* Hardware timers are limited and hardware dependent, making our code non-portable.
+* Software timers are a good option
 
-## Serial communication on ESP32-S3
+We can use the FreeRTOS timer library. The timer service task(timer daemon) will be created in the background that maintains a list of timers and calling the associated callback functions when any of them expires. It can block itself and wake up when the timers expire, therefore not competing for resources with other tasks. The timer service task also persists beyond the app_main returning.
+
+Since the timer service task calls the callback function, the function has the same priority level as the timer service task itself. We also want to treat these callback functions as if they were ISRs, therefore we generally do not want to use delay functions or allow for blocking when using queues, mutexes and semaphores inside the callback functions. We do not want to control the timer service task directly.
+
+FreeRTOS provides a timer command queue and API functions to access it. To send commands to the timer service task, we use the API functions to send the commands to the timer command queue. The timer service task will read the timer command queue and perform the commands like creating a new timer, start, stop, restart etc.
+
+https://www.freertos.org/FreeRTOS-Software-Timer-API-Functions.html
+
+### Code
+* `static TimerHandle_t my_timer = NULL;` Create timer handle
+
+		// Create timer
+        my_timer = xTimerCreate (
+                "My timer",               // Name
+                2000 / portTICK_PERIOD_MS,      // Period of timer (ticks)
+                pdFALSE,                        // Auto-reload
+                (void *)0,                      // Timer ID (uint32, but must cast to void pointer)
+                timer_callback                  // Callback function
+        );
+
+* `xTimerStart(one_shot_timer, portMAX_DELAY);` Start timer
+
+## ESP32-S3 board
+### Serial Terminal
 
 Successful setup would allow using standard C functions like printf and fgets. 
 
 On ESP-IDF, open `idf.py menuconfig`. Navigate to `Component Config/ESP System Settings/Channel for console output` option and ensure that `USB Serial/JTAG Controller` is selected.
 
 On forums, it was recommended to install the usb-serial-jtag driver, but that is no longer necessary.
+
+Stdout buffer is on by default, so output only gets printed when a newline is added. To print any char, use fsync(fileno(stdout)) to flush the stdout.
+
+https://github.com/espressif/esp-idf/issues/2820
+
+### GPIO Pins
+
+* When starting, we want to reset the pin we want to use with `gpio_reset_pin(PIN_NUM)`. Then set the pin's direction(1 for on or off) with `gpio_set_direction(PIN_NUM, GPIO_MODE_OUTPUT);`.
+* Set pins with `gpio_set_level(PIN_NUM, 1);`.
